@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.bale
+*.db
+.venv/
+venv/
+.env
+*.log
+.idea/
+.vscode/
