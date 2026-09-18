@@ -13,15 +13,15 @@ from state import state
 from handlers import start_router, panel_router, messages_router
 
 logging.basicConfig(
-    level=logging.WARNING,  # ترمینال خلوت
-    format="%(asctime)s | %(levelname)s | %(message)s"
+    level=logging.WARNING,
+    format="%(asctime)s | %(levelname)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 TEHRAN = timezone(timedelta(hours=3, minutes=30))
 
 dp = Dispatcher()
-# ترتیب مهم است
+# Order matters: specific commands first, AFK catch-all last
 dp.include_router(start_router)
 dp.include_router(panel_router)
 dp.include_router(messages_router)
@@ -39,7 +39,6 @@ async def name_clock_loop(client: Client):
                     logger.warning("edit_name failed: %s", e)
         except Exception as e:
             logger.exception("name_clock_loop: %s", e)
-
         await asyncio.sleep(NAME_UPDATE_INTERVAL)
 
 
