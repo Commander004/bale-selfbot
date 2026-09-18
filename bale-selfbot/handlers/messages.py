@@ -1,4 +1,5 @@
 # handlers/messages.py
+"""AFK commands + auto-reply to private messages from others."""
 import logging
 
 from aiobale import Router, F
@@ -37,19 +38,26 @@ async def cmd_unafk(msg: Message):
     await safe_send(msg, "❌ AFK خاموش شد.")
 
 
-@router.message(F.text)
-async def afk_reply(msg: Message):
-    # شرط‌ها داخل تابع — فقط وقتی لازم است جواب می‌دهد
+@router.message()
+async def afk_auto_reply(msg: Message):
+    """
+    Catch remaining updates for AFK reply only.
+    Must be last handler in this router.
+    Does NOT block other routers if they are registered BEFORE messages_router
+    and those handlers already matched — in aiobale, order is include order.
+    Panel must NOT have a bare @router.message() catch-all.
+    """
     if not state.afk_enabled:
         return
     if not msg.sender_id or msg.sender_id == ADMIN_ID:
         return
     if not is_private(msg):
         return
-    if not msg.text or msg.text.startswith("/"):
+    text = msg.text
+    if not text or str(text).startswith("/"):
         return
 
     try:
         await safe_send(msg, state.afk_text, reply=False)
     except Exception as e:
-        logger.error("AFK error: %s", e)
+        logger.error("AFK send failed: %s", e)
