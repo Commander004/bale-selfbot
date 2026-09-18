@@ -17,7 +17,6 @@ from utils import safe_send, is_admin
 logger = logging.getLogger(__name__)
 router = Router()
 
-# تهران = UTC+3:30
 TEHRAN = timezone(timedelta(hours=3, minutes=30))
 
 SWEARS = [
@@ -27,24 +26,36 @@ SWEARS = [
 ]
 
 
-# ---------- پنل ----------
+def _waiting_name_format(msg: Message) -> bool:
+    """Only match when admin is entering name format after /time on."""
+    if not state.waiting_for_format:
+        return False
+    if msg.sender_id != ADMIN_ID:
+        return False
+    if not msg.text:
+        return False
+    if str(msg.text).startswith("/"):
+        return False
+    return True
+
+
 @router.message(F.text == "/panel")
 async def cmd_panel(msg: Message):
     if not is_admin(msg, ADMIN_ID):
         return
     text = (
         "⚙️ پنل مدیریت\n\n"
-        "/profile      اطلاعات + پینگ\n"
-        "/status       وضعیت سیستم\n"
-        "/test         تست ارسال\n"
-        "/afk متن      فعال کردن AFK\n"
-        "/unafk        خاموش کردن AFK\n"
-        "/time on      روشن کردن ساعت اسم\n"
-        "/time off     خاموش کردن ساعت اسم\n"
-        "/bold on|off  بولد خودکار\n"
+        "/profile       اطلاعات + پینگ\n"
+        "/status        وضعیت سیستم\n"
+        "/test          تست ارسال\n"
+        "/afk متن       فعال کردن AFK\n"
+        "/unafk         خاموش کردن AFK\n"
+        "/time on       روشن کردن ساعت اسم\n"
+        "/time off      خاموش کردن ساعت اسم\n"
+        "/bold on|off   بولد خودکار\n"
         "/italic on|off ایتالیک خودکار\n"
-        "اسپم N متن    تکرار متن\n"
-        "رگباری N      فحش رگباری"
+        "اسپم N متن     تکرار متن\n"
+        "رگباری N       فحش رگباری"
     )
     await safe_send(msg, text)
 
@@ -57,7 +68,6 @@ async def cmd_profile(msg: Message):
     save_user(msg.sender_id)
     user = get_user(msg.sender_id)
 
-    # پینگ
     t0 = time.perf_counter()
     try:
         await msg.client.get_me()
@@ -65,7 +75,6 @@ async def cmd_profile(msg: Message):
     except Exception:
         ping_ms = -1
 
-    # قابلیت‌های فعال
     active = []
     if state.afk_enabled:
         active.append("AFK")
@@ -117,28 +126,6 @@ async def cmd_test(msg: Message):
     await safe_send(msg, "✅ سیستم ارسال پیام سالم است.")
 
 
-# ---------- AFK ----------
-@router.message(F.text.startswith("/afk"))
-async def cmd_afk(msg: Message):
-    if not is_admin(msg, ADMIN_ID):
-        return
-    text = msg.text[4:].strip()
-    if not text:
-        text = "سلام نیستم، بعداً پیام بده."
-    state.afk_enabled = True
-    state.afk_text = text
-    await safe_send(msg, f"✅ AFK فعال شد:\n{text}")
-
-
-@router.message(F.text == "/unafk")
-async def cmd_unafk(msg: Message):
-    if not is_admin(msg, ADMIN_ID):
-        return
-    state.afk_enabled = False
-    await safe_send(msg, "❌ AFK خاموش شد.")
-
-
-# ---------- Bold / Italic ----------
 @router.message(F.text == "/bold on")
 async def cmd_bold_on(msg: Message):
     if not is_admin(msg, ADMIN_ID):
@@ -171,7 +158,6 @@ async def cmd_italic_off(msg: Message):
     await safe_send(msg, "❌ Italic خاموش شد.")
 
 
-# ---------- اسپم ----------
 @router.message(F.text.startswith("اسپم "))
 async def cmd_spam(msg: Message):
     if not is_admin(msg, ADMIN_ID):
@@ -194,7 +180,6 @@ async def cmd_spam(msg: Message):
         await asyncio.sleep(0.4)
 
 
-# ---------- رگباری ----------
 @router.message(F.text.startswith("رگباری "))
 async def cmd_ragbari(msg: Message):
     if not is_admin(msg, ADMIN_ID):
@@ -216,7 +201,6 @@ async def cmd_ragbari(msg: Message):
         await asyncio.sleep(0.35)
 
 
-# ---------- ساعت روی اسم ----------
 @router.message(F.text == "/time")
 async def cmd_time_help(msg: Message):
     if not is_admin(msg, ADMIN_ID):
@@ -256,19 +240,10 @@ async def cmd_time_off(msg: Message):
     await safe_send(msg, "❌ ساعت روی اسم خاموش شد.")
 
 
-@router.message()
+# IMPORTANT: no bare @router.message() — that was blocking AFK
+@router.message(F.func(_waiting_name_format))
 async def receive_name_format(msg: Message):
-    """دریافت فرمت بعد از /time on"""
-    if not is_admin(msg, ADMIN_ID):
-        return
-    if not state.waiting_for_format:
-        return
-    if not msg.text:
-        return
-
     text = msg.text.strip()
-    if text.startswith("/"):
-        return
 
     if "time" not in text.lower():
         await safe_send(
@@ -295,5 +270,5 @@ async def receive_name_format(msg: Message):
             f"الان: `{new_name}`"
         )
     except Exception as e:
-        logger.error("خطا در edit_name: %s", e)
+        logger.error("edit_name error: %s", e)
         await safe_send(msg, f"فرمت ذخیره شد ولی ویرایش اسم خطا داد:\n{e}")
